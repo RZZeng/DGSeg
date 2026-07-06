@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pt
+*.pth
+*.safetensors
+checkpoints/
+runs/
+outputs/
+wandb/
+*.jsonl
+*.log

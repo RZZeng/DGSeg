@@ -1,0 +1,15 @@
+torch
+transformers
+datasets
+trl
+peft
+accelerate
+deepspeed
+qwen-vl-utils
+opencv-python
+pillow
+numpy
+tqdm
+matplotlib
+pycocotools
+tensorboard
