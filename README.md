@@ -7,41 +7,7 @@ DGSeg addresses reasoning segmentation, where a model must segment the target ob
 ![DGSeg method overview](assets/method.png)
 
 
-## Repository Layout
-
-```text
-DGSeg/
-|-- README.md
-|-- requirements.txt
-|-- assets/
-|   `-- method.png
-|-- tools/
-|   `-- build_refcoco_datasets.py
-|-- run_scripts/
-|   |-- run_grpo_rec_lora_refcocog_9000_3b.sh
-|   |-- run_grpo_rec_lora_refcocog_9000_7b.sh
-|   |-- train_fusion_3b.sh
-|   `-- train_fusion_7b.sh
-|-- sam3/                         # SAM3 code used by DGSeg
-`-- src/
-    |-- open-r1-multimodal/        # Qwen2.5-VL GRPO training code
-    |-- train_fusion/              # SAM3 fusion module training
-    `-- reasonseg_eval/            # RefCOCO-family and ReasonSeg evaluation
-```
-
-Main entry files:
-
-- `src/open-r1-multimodal/src/open_r1/train_qwen25_refcocog_grpo.py`: Qwen2.5-VL GRPO training on RefCOCOg 9000 samples.
-- `src/open-r1-multimodal/src/open_r1/vlm_modules/qwen_module_seg.py`: answer parsing and SAM3-based reward computation.
-- `src/train_fusion/train_sam3_fusion_qwen25_3b.py`: fusion module training for Qwen2.5-VL-3B predictions.
-- `src/train_fusion/train_sam3_fusion_qwen25_7b.py`: fusion module training for Qwen2.5-VL-7B predictions.
-- `src/reasonseg_eval/eval_refcoco.py`: RefCOCO, RefCOCO+, and RefCOCOg evaluation.
-- `src/reasonseg_eval/eval_reasonseg.py`: ReasonSeg evaluation.
-- `tools/build_refcoco_datasets.py`: builds the DGSeg RefCOCO-family JSON files from REFER-style annotations.
-
 ## Environment Setup
-
-The code was developed with Python 3.10, PyTorch, Transformers, TRL, PEFT, DeepSpeed, and CUDA GPUs. A typical setup is:
 
 ```bash
 conda create -n dgseg python=3.10 -y
@@ -75,15 +41,12 @@ export SAM3_REPO_PATH=${DGSEG_ROOT}/sam3
 export SAM3_CHECKPOINT=${MODEL_ROOT}/sam3.pt
 ```
 
-`flash-attn` is optional if your environment does not support it. In that case, edit the training scripts and replace `--attn_implementation flash_attention_2` with a supported attention backend.
-
 ## Data Preparation
 
-DGSeg does not redistribute datasets, model weights, generated predictions, or trained checkpoints. The data preparation follows two steps.
 
 ### Step 1: Prepare Raw Data
 
-Download COCO images, RefCOCO-family annotations, and ReasonSeg from their official sources. The RefCOCO-family annotations should be organized in the REFER-style format with `instances.json` and `refs(...).p` files:
+Download RefCOCO and ReasonSeg from their official sources. The RefCOCO-family annotations should be organized in the REFER-style format with `instances.json` and `refs(...).p` files:
 
 ```text
 ${DATA_ROOT}/refer_seg/
@@ -120,39 +83,6 @@ python tools/build_refcoco_datasets.py \
   --output-dir ${DATA_ROOT}
 ```
 
-This creates files such as `refcocog_train_dataset.json`, `refcoco_val_dataset.json`, and `refcoco+_testA_dataset.json`. Each item contains fields including `image_file`, `sentences`, and `segmentation`.
-
-Fusion training additionally requires cached Qwen2.5-VL predictions on the RefCOCOg training set, for example:
-
-```text
-${DGSEG_ROOT}/data/refcocog_train_predictions_3b.jsonl
-${DGSEG_ROOT}/data/refcocog_train_predictions.jsonl
-```
-
-Each JSONL record should contain the model output text and image sizes, either as a list:
-
-```json
-["<answer>{...}</answer>", 1024, 1024, 480, 640]
-```
-
-or as a dictionary:
-
-```json
-{"output_text": "<answer>{...}</answer>", "input_h": 1024, "input_w": 1024, "img_h": 480, "img_w": 640}
-```
-
-Generate this cache with the RefCOCO-family inference entry before Stage 2:
-
-```bash
-cd ${DGSEG_ROOT}/src/reasonseg_eval
-DATASET=refcocog SPLIT=train DEBUG_MODE=true CACHE_ONLY=true \
-REFCOCO_JSON_DIR=${DATA_ROOT}/refcocog_train_dataset.json \
-TARGET_JSON_FILE=${DGSEG_ROOT}/data/refcocog_train_predictions.jsonl \
-torchrun --nproc_per_node=2 eval_refcoco.py
-```
-
-Use `refcocog_train_predictions_3b.jsonl` as `TARGET_JSON_FILE` for the 3B model.
-
 ## Training
 
 Before training, set the common paths used by the scripts, especially `DGSEG_ROOT`, `DATA_ROOT`, `MODEL_PATH`, `SAM3_CHECKPOINT`, and the relevant data paths.
@@ -171,16 +101,12 @@ bash run_scripts/run_grpo_rec_lora_refcocog_9000_7b.sh
 After obtaining cached Qwen2.5-VL predictions, train the SAM3 fusion module:
 
 ```bash
-sbatch --partition=<partition> run_scripts/train_fusion_3b.sh
-sbatch --partition=<partition> run_scripts/train_fusion_7b.sh
+bash run_scripts/train_fusion_3b.sh
+bash run_scripts/train_fusion_7b.sh
 ```
-
-Replace `<partition>` with a partition available on your Slurm cluster. Set
-`CONDA_ENV` only when using an environment name other than `dgseg`.
 
 ## Evaluation
 
-The evaluation scripts support both full inference and cached-output evaluation. If `DEBUG_MODE=true` and `TARGET_JSON_FILE` exists, cached Qwen2.5-VL outputs are reused.
 
 For RefCOCO-family evaluation, configure the split-related variables in the shell or script (`DATASET`, `SPLIT`, `REFCOCO_JSON_DIR`, `IMAGE_FOLDER`, `MODEL_PATH`, `SAM3_CHECKPOINT`, and `FUSION_CKPT`) and run:
 
