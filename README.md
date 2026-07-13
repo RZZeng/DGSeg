@@ -128,5 +128,13 @@ This project has referenced some excellent open-source repositories ([VLM-R1](ht
 
 ## Citation
 
-If you find this repository useful, please cite the DGSeg paper. The BibTeX entry will be added after publication.
+If you find this repository useful, please cite the DGSeg paper. 
+```
+@article{zeng2026dgseg,
+  title={DGSeg: Dynamic Gating of Semantic-Spatial Guided Predictions for Reasoning Segmentation},
+  author={Zeng, Ruizhe and Cao, Siyu and Zhang, Lu and Liu, Zhiyong},
+  journal={arXiv preprint arXiv:2607.04779},
+  year={2026}
+}
 
+```
